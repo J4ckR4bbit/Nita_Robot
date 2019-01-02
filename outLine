@@ -1,0 +1,600 @@
+
+
+
+//------------------------------------------------------------------------------
+//  LIBRARIES
+//------------------------------------------------------------------------------
+#include <Arduino.h>
+#include <Servo.h>
+#include <HCSR04.h>
+//------------------------------------------------------------------------------
+//        WEMOS PINS
+//------------------------------------------------------------------------------
+const int rightServoPin = 12;
+const int leftServoPin = 16;
+const int frontServoPin = 12;
+const int triggerPin = 15;
+const int echoPin = 2;
+
+//------------------------------------------------------------------------------
+//  LIB SETTINGS
+//------------------------------------------------------------------------------
+Servo servoFront;
+Servo servoRight;
+Servo servoLeft;
+
+UltraSonicDistanceSensor distanceSensor(triggerPin, echoPin);  // Initialize sensor that uses digital pins 2[9](ECHO) and 15[10] (TRIGGER)
+
+//------------------------------------------------------------------------------
+//        CONSTANT VARIABLES
+//------------------------------------------------------------------------------
+
+//for sensor servo
+const int posMaxRGT = 30;
+const int posHalfRGT = 60;
+
+const int posCenter = 90; // position of servoFront
+
+const int posHalfLFT = 120;
+const int posMaxLFT = 150;
+
+// for wheel servos
+const int noSpeed = 90;
+const int rightFrwdMaxSpeed = 0;
+const int rightRvrsMaxSpeed = 180;
+const int leftFrwdMaxSpeed = 180;
+const int leftRvrsMaxSpeed = 0;
+//------------------------------------------------------------------------------
+//  WORDS
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+//  VARIABLES
+//------------------------------------------------------------------------------
+int nowPos;        // the angle of the ultrasonic sensor changes in for loop.
+float ultraSonicRead; // value read directly from the UltraSonic Sensor.
+
+int printSerial = 1; // If 1 then serial printing will occur if 0 then it wont.
+
+//TIME
+int fullSec = 1024;
+int halfSec = 512;
+int quarterSec = 256;
+int eighthSec = 128;
+//------------------------------------------------------------------------------
+//  FUNCTIONS
+//------------------------------------------------------------------------------
+
+//^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
+//  TIME
+//^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
+void delayFor(int delayTime)
+{
+  // unsigned long startDelay = millis();
+  // while (millis() - startDelay <= delayTime )
+  // {
+  //   if (millis() - startDelay >= delayTime )
+  //   {
+  //     break;
+  //   }
+  // }
+  delay(delayTime);
+}//delayFor
+//^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
+//  SERIAL PRINT
+//^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
+void printLine()
+{
+  Serial.print("-------------------------------------------\n");
+}
+void printDotLine()
+{
+  Serial.print("- - - - - - - - - - - - - - - - - - - - - -\n");
+}
+void printHashLine()
+{
+  Serial.print("###########################################\n");
+}
+void printBlank()
+{
+  Serial.print("\n");
+}
+void printError()
+{
+  Serial.print("|||||||||||||||||| ERROR ||||||||||||||||||");
+  printBlank();
+}
+
+void printObjectInfo(String objectType, String objectFieldOne, String objectFieldTwo, String symbolType)
+{
+  printLine();
+  Serial.print(symbolType);
+  Serial.print("|  ");
+  Serial.print(objectType);
+  Serial.print("\t|  ");
+  Serial.print(objectFieldOne);
+  Serial.print("  |  ");
+  Serial.print(objectFieldTwo);
+  Serial.print("\t|");
+  Serial.print(symbolType);
+  Serial.print("\n");
+}
+void printSensorInfo(String objectType, String objectFieldOne, String objectFieldTwo)
+{
+  printDotLine();
+  Serial.print("??|  ");
+  Serial.print(objectType);
+  Serial.print("\t|  ");
+  Serial.print(objectFieldOne);
+  Serial.print("  |  ");
+  Serial.print(objectFieldTwo);
+  Serial.print("\t|??\n");
+}
+void printReturnBasic(String variableOne, int returnValue) //
+{
+  Serial.print("\t[ ");
+  Serial.print(variableOne);
+  Serial.print(" | ");
+  Serial.print(returnValue);
+  Serial.print(" ]\n");
+}
+void printReturnToggle(String variableOne, int returnValue, int newLine) //
+{
+  Serial.print("\t[ ");
+  Serial.print(variableOne);
+  Serial.print(" : ");
+  Serial.print(returnValue);
+  if(newLine == 1) // goes to the next line if newline is 1.
+  {
+    Serial.print(" ]\n");
+  }
+  if(newLine == 0)
+  {
+    Serial.print(" ] ");
+  }
+
+}
+void printObjectReturnOne_B(String variableOne, int returnValue ) //(x : y) \n
+{
+  Serial.print(" ( ");
+  Serial.print(variableOne);
+  Serial.print(" : ");
+  Serial.print(returnValue);
+  Serial.print(" )\n");
+}
+void printObjectReturnTwo(String variableOne, int returnValue)
+{
+  Serial.print("\t( ");
+  Serial.print(variableOne);
+  Serial.print(" : ");
+  Serial.print(returnValue);
+  Serial.print(" )\n");
+}
+void printObjectReturnThree(String variableOne, int returnValue)
+{
+  Serial.print("\t{ ");
+  Serial.print(variableOne);
+  Serial.print(" = ");
+  Serial.print(returnValue);
+  Serial.print(" }\n");
+}
+void printReturnFloat(String variableOne, float returnValue)
+{
+  Serial.print("\t{ ");
+  Serial.print(variableOne);
+  Serial.print(" = ");
+  Serial.print(returnValue, 1);
+  Serial.print(" }\n");
+}
+void printObjectReturnSec(String variableOne, float returnValue)
+{
+  Serial.print("\t! ");
+  Serial.print(variableOne);
+  Serial.print(" = ");
+  Serial.print(returnValue);
+  Serial.print("s !\n");
+}
+void printObjectReturnMilliSec(String variableOne, float returnValue)
+{
+  Serial.print("\t! ");
+  Serial.print(variableOne);
+  Serial.print(" = ");
+  Serial.print(returnValue);
+  Serial.print("ms !\n");
+}
+//^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
+
+
+//^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
+//  FRONT SERVO
+//^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
+void sensorServo(int movePos) // takes an angle  0 - 180 and moves the servo.
+{
+  servoFront.write(movePos);
+}
+//..............................................................................
+void turnSensorServo(int fromPos, int toPos, int delayPWM)// move the servo on the front.
+{
+  int deltaPos = toPos - fromPos; // checks the difference between initial and final positions
+
+  if (deltaPos > 0) // activated when deltaPos is positive
+  {
+    for (nowPos = fromPos; nowPos <= toPos; nowPos++)// in steps of 1 degree
+    {
+      sensorServo(nowPos);
+      delayFor(delayPWM);
+    } //for (pos++)
+  }// if (deltaPos > 0)
+
+  if (deltaPos < 0) // activated when deltaPos is negative
+  {
+    for (nowPos = fromPos; nowPos >= toPos; nowPos--)// in steps of 1 degree
+    {
+      sensorServo(nowPos);
+      delayFor(delayPWM);
+    } //for (pos--)
+  }// if (deltaPos < 0)
+
+  if (deltaPos == 0) // activated when deltaPos is negative
+  {
+    sensorServo(nowPos);
+    delayFor(fullSec);
+  }// if (deltaPos == 0)
+  //---------------------------------------------------------
+  if(printSerial == 1) // Serial Print out of the function
+  {
+
+    printObjectInfo("SERVO", "FRONT", "SG-90", "++");
+
+    Serial.print("\t[  from = ");//start new variable print
+    if (fromPos == 90) // print "MID"
+    {
+      Serial.print("MID");
+    } // if (mid)
+    if (fromPos > 90)// print "LFT"
+    {
+      Serial.print("LFT");
+    }// if (lft)
+    if (fromPos < 90)// print "RGT"
+    {
+      Serial.print("RGT");
+    }// if (rgt)
+    Serial.print(" ] ");
+
+    printObjectReturnOne_B("angle", fromPos);
+
+    Serial.print("\t[    to = "); //start new variable print
+    if (toPos == 90)
+    {
+      Serial.print("MID");
+    }// if (mid)
+    if (toPos > 90)
+    {
+      Serial.print("LFT");
+    }// if (lft)
+    if (toPos < 90)
+    {
+      Serial.print("RGT");
+    }// if (rgt)
+
+
+    Serial.print(" ] "); // end line of serial print
+    printObjectReturnOne_B("angle", toPos);
+    printObjectReturnThree("delta", deltaPos);
+    printObjectReturnMilliSec("delay", delayPWM);
+    printBlank();
+  } // if(printSerial == 1)
+}
+
+//^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
+//  FRONT SERVO
+//^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
+
+void rightWheelGo(int rightSpeed, int goRightFor )// activate the right wheel
+{
+  servoRight.write(rightSpeed);
+  delayFor(goRightFor);
+  //---------------------------------------------------------
+  if(printSerial == 1) // Serial Print out of the function
+  {
+    float inSecR = (float)goRightFor / 1000.00; // turns the millis into seconds
+    printObjectInfo("SERVO", "RIGHT", "FS-90R",">>");
+    printReturnBasic("speed", rightSpeed);
+    printReturnFloat("move", inSecR);
+    printBlank();
+  }
+}
+void leftWheelGo(int leftSpeed, int goLeftFor ) // activate the left wheel to
+{
+  servoLeft.write(leftSpeed);
+  delayFor(goLeftFor);
+  //---------------------------------------------------------
+  if(printSerial == 1) // Serial Print out of the function
+  {
+    float inSecL = (float)goLeftFor / 1000.00;// turns the millis into seconds
+    printObjectInfo("SERVO", "LEFT", "FS-90R","<<");
+    printReturnBasic("speed", leftSpeed);
+    printReturnFloat("move", inSecL);
+    printBlank();
+  }
+}
+void bothWheelsGo(int rightSpeed, int leftSpeed, int goBothFor)// activate both wheels to move.
+{
+  servoRight.write(rightSpeed);
+  servoLeft.write(leftSpeed);
+  delayFor(goBothFor);
+
+  if(printSerial == 1) // Serial Print out of the function
+  {
+    float inSecB = (float)goBothFor / 1000.00;// turns the millis into seconds
+
+    printObjectInfo("SERVO", "BOTH", "FS-90R","<>");
+
+    Serial.print(" - RIGHT WHEEL\n");
+    printReturnBasic("speed", rightSpeed);
+    printReturnFloat("time", inSecB);
+
+    Serial.print(" - LEFT WHEEL\n");
+    printReturnBasic("speed", leftSpeed);
+    printReturnFloat("time", inSecB);
+    printBlank();
+  }
+
+}
+//^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
+// STOPPING THE WHEELS
+void rightWheelStop()// stop the right wheel.
+{
+  servoRight.write(noSpeed);
+  if(printSerial == 1) // Serial Print out of the function
+  {
+    printObjectInfo("SERVO", "RIGHT", "FS-90R", "#>");
+    printReturnBasic("speed", 0);
+    printBlank();
+  }
+}
+void leftWheelStop()// activate the right wheel to move.
+{
+  servoLeft.write(noSpeed);
+  if(printSerial == 1) // Serial Print out of the function
+  {
+    printObjectInfo("SERVO", "LEFT", "FS-90R", "<#");
+    printReturnBasic("speed", 0);
+    printBlank();
+  }
+}
+void bothWheelsStop()// activate the right wheel to move.
+{
+  servoRight.write(noSpeed);
+  servoLeft.write(noSpeed);
+  if(printSerial == 1) // Serial Print out of the function
+  {
+    printObjectInfo("SERVO", "BOTH", "FS-90R", "##");
+    printReturnBasic(" left", 0);
+    printReturnBasic("right", 0);
+    printBlank();
+  }
+}
+//^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
+void getDistance() // ping the ultasonic sensor
+{
+  ultraSonicRead = distanceSensor.measureDistanceCm();
+}
+void getPrintDistance(int delayDistance) // ping the ultasonic sensor and print to serial.
+{
+  delayFor(delayDistance);
+  ultraSonicRead = distanceSensor.measureDistanceCm();
+  delayFor(delayDistance);
+
+  if(printSerial == 1)
+  {
+    printSensorInfo("SENSOR", "HC-SRO4", "FRONT");
+    printReturnFloat("dist", ultraSonicRead);
+    printBlank();
+  }
+}
+//^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
+void initServos()
+{
+  servoFront.write(posCenter);
+  servoRight.write(noSpeed);
+  servoLeft.write(noSpeed);
+}
+//^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
+void startUpRoutine() //main routine in setup contains testing and checking
+{
+
+  //print "loading" out
+  printBlank();
+  printBlank();
+  printBlank();
+
+  Serial.println("|\t|\t|\t|\t|\t|\t|");
+  char loading[] = "loading...";
+  int letterInArray = 0;
+  Serial.print("\t\t");
+  for(int x = 0; x<10;x++)
+  {
+    Serial.print(loading[letterInArray]);
+    delayFor(eighthSec);
+    letterInArray++;
+  }
+
+  Serial.println("");
+  Serial.println("|\t|\t|\t|\t|\t|\t|");
+  // printObjectInfo("OBJECT", "InfoA", "InfoB");
+  printHashLine();
+  delayFor(halfSec);
+  Serial.print("\t    N");
+  delayFor(eighthSec);
+  Serial.print(" I");
+  delayFor(eighthSec);
+  Serial.print(" T");
+  delayFor(eighthSec);
+  Serial.println(" A");
+  delayFor(quarterSec);
+  Serial.print("\t     R");
+  delayFor(quarterSec);
+  Serial.print("O");
+  delayFor(quarterSec);
+  Serial.print("B");
+  delayFor(quarterSec);
+  Serial.print("O");
+  delayFor(quarterSec);
+  Serial.print("T      \n");
+  delayFor(halfSec);
+  printHashLine();
+  delayFor(quarterSec);
+  Serial.println("  >           ver.1          <  ");
+  delayFor(quarterSec);
+  printLine();
+  Serial.println("@@\t\t  SYSTEM CHECK\t\t @@  ");
+  printLine();
+  Serial.print("\n");
+
+  getDistance();
+
+
+  if (ultraSonicRead == -1) // checks if the dip switches have been turned on.
+  {
+    printError();
+    printObjectInfo("SENSOR", "HC-SRO4", "FRONT");
+    Serial.println("  | switch DIP 1 and 2 - ON  |  ");
+    Serial.print("  |");
+
+    int countCheck = 0; // used in while loop to skip to next line.
+
+    while (ultraSonicRead == -1) // keep a loop going while the DIP buttons ore off.
+    {
+      countCheck++;
+      Serial.print(".");
+
+      if (countCheck == 26) // sets counter back to zero and start a new serial line.
+      {
+        Serial.println("|");
+        Serial.print("  |");
+        countCheck = 0;
+      }
+
+      getDistance();
+
+      if (ultraSonicRead != -1 ) // when dip buttons are on if will be entered breaking the loop. ( -1 is used as that is the returned value if the sensor is not working)
+      {
+        delayFor(halfSec);
+        Serial.println("");
+        Serial.println("         -->  ERROR | SORTED |  ");
+        Serial.println("");
+        delayFor(halfSec);
+        break;
+      }
+    }
+  }
+  getDistance();
+  if (ultraSonicRead != -1)
+  {
+    printObjectInfo("SENSOR", "HC-SRO4", "FRONT");
+  }
+}
+
+//------------------------------------------------------------------------------
+//  SETUP
+//------------------------------------------------------------------------------
+void setup()
+{
+  Serial.begin(115200);
+
+  servoFront.attach(12);
+  servoRight.attach(16); // 0 <- forward 90 -> reverse ->180
+  servoLeft.attach(14); // 0 <-reverse <- 90 -> forward -> 180
+
+  Serial.println("");
+
+
+  initServos();
+  startUpRoutine();
+
+
+  getPrintDistance(halfSec);
+  getPrintDistance(halfSec);
+  getPrintDistance(halfSec);
+
+  turnSensorServo(posCenter,  posMaxLFT, 5);
+  getPrintDistance(halfSec);
+  getPrintDistance(halfSec);
+  getPrintDistance(halfSec);
+
+  turnSensorServo(posMaxLFT,  posCenter, 5);
+  getPrintDistance(halfSec);
+  getPrintDistance(halfSec);
+  getPrintDistance(halfSec);
+
+  turnSensorServo(posCenter,  posMaxRGT, 5);
+  getPrintDistance(halfSec);
+  getPrintDistance(halfSec);
+  getPrintDistance(halfSec);
+
+  turnSensorServo(posMaxRGT,  posCenter, 5);
+  getPrintDistance(halfSec);
+  getPrintDistance(halfSec);
+  getPrintDistance(halfSec);
+
+  rightWheelGo(rightFrwdMaxSpeed, halfSec);
+  rightWheelStop();
+  delayFor(quarterSec);
+
+  leftWheelGo(leftFrwdMaxSpeed, halfSec);
+  leftWheelStop();
+  delayFor(halfSec);
+
+  bothWheelsGo(rightFrwdMaxSpeed, leftRvrsMaxSpeed, halfSec);
+  bothWheelsStop();
+  delayFor(halfSec);
+
+  bothWheelsGo(rightRvrsMaxSpeed, leftFrwdMaxSpeed, halfSec);
+  bothWheelsStop();
+  delayFor(halfSec);
+  // initServos();
+
+
+
+  //
+  //
+  // // servoFrontStartUp(halfSec); // makes the servo up front jiggle
+  // wheelStartUp(quarterSec); // wheel should spin direct: > rF > rR  > lF > lR
+
+
+}//setup()
+
+//------------------------------------------------------------------------------
+//  LOOP
+//------------------------------------------------------------------------------
+void loop()
+{
+  // int accSpeed = 90;
+  //
+  // for (int x = 0; x < 90; x =- 5)
+  // {
+  //   accSpeed = accSpeed - 5;
+  //   rightWheelGo(accSpeed, halfSec);
+  //   delayFor(halfSec);
+  //   rightWheelStop();
+  //
+  //
+  //   if(printSerial == 1) // Serial Print out of the function
+  //   {
+  //     Serial.print("% % TESTS  | SERVO | SPEED  \n");
+  //     Serial.print("      [ speed = ");
+  //     Serial.print(accSpeed);
+  //     Serial.print(" ]\n");
+  //
+  //     Serial.print("        ( delay = ");
+  //     float inSecL = (float)halfSec / 1000.00;
+  //     Serial.print(inSecL,1);
+  //     Serial.print("ms ]\n\n");
+  //   }
+  //   delayFor(fullSec);
+
+  // }
+
+
+}
